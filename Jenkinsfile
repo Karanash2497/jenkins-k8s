@@ -50,27 +50,36 @@ pipeline {
         }
 
         stage('Deploy to Kubernetes') {
-            steps {
-                echo 'Deploying to Minikube...'
-                sh '''
-                    # Update image in deployment yaml
-                    sed -i "s|IMAGE_PLACEHOLDER|$ECR_REPO:$IMAGE_TAG|g" \
-                        k8s/deployment.yaml
-                    sed -i "s|BUILD_PLACEHOLDER|$BUILD_NUMBER|g" \
-                        k8s/deployment.yaml
+    steps {
+        echo 'Deploying to Minikube...'
+        sh '''
+            # Refresh ECR secret (token expires every 12 hours)
+            ECR_PASSWORD=$(aws ecr get-login-password --region $AWS_REGION)
+            kubectl create secret docker-registry ecr-secret \
+                --docker-server=992382473180.dkr.ecr.ap-south-1.amazonaws.com \
+                --docker-username=AWS \
+                --docker-password=$ECR_PASSWORD \
+                --namespace=default \
+                --dry-run=client -o yaml | kubectl apply -f -
 
-                    # Apply kubernetes manifests
-                    kubectl apply -f k8s/deployment.yaml
-                    kubectl apply -f k8s/service.yaml
+            # Update image and build number in deployment yaml
+            sed -i "s|IMAGE_PLACEHOLDER|$ECR_REPO:$IMAGE_TAG|g" \
+                k8s/deployment.yaml
+            sed -i "s|BUILD_PLACEHOLDER|$BUILD_NUMBER|g" \
+                k8s/deployment.yaml
 
-                    # Wait for rollout to complete
-                    kubectl rollout status deployment/jenkins-k8s-app \
-                        --timeout=120s
+            # Apply kubernetes manifests
+            kubectl apply -f k8s/deployment.yaml
+            kubectl apply -f k8s/service.yaml
 
-                    echo "Deployment complete!"
-                '''
-            }
-        }
+            # Wait for rollout to complete
+            kubectl rollout status deployment/jenkins-k8s-app \
+                --timeout=120s
+
+            echo "Deployment complete!"
+        '''
+    }
+}
 
         stage('Verify Deployment') {
             steps {
