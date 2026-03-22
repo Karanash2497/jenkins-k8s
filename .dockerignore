@@ -1,0 +1,5 @@
+node_modules
+.git
+*.log
+Jenkinsfile
+k8s/
