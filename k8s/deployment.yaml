@@ -20,6 +20,8 @@ spec:
       labels:
         app: jenkins-k8s-app
     spec:
+      imagePullSecrets:
+        - name: ecr-secret
       containers:
         - name: jenkins-k8s-app
           image: IMAGE_PLACEHOLDER
